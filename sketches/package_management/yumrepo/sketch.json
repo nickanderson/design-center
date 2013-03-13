@@ -12,7 +12,7 @@
     {
         name: "Repository::Yum::Maintain",
 	    description: "Create and keep Yum repository metadata up to date",
-        version: 2.3,
+        version: 3.0.0,
         license: "MIT",
         tags: [ "cfdc" ],
         authors: [ "Nick Anderson <nick@cmdln.org>", "Ted Zlatanov <tzz@lifelogs.com>" ],
@@ -22,6 +22,18 @@
                    cfengine: { version: "3.4.0" },
                    os: [ "linux" ]
                  },
+    },
+
+    api:
+    {
+        manage_metadata:
+        [
+          { type: "environment", name: "runenv", },
+          { type: "metadata", name: "metadata", },
+          { type: "string", name: "path", },
+          { type: "string", name: "perm_o", },
+          { type: "string", name: "perm_g", },
+        ],
     },
 
     entry_point: "main.cf",
