@@ -1,0 +1,10 @@
+{
+    "System::Sudoers":
+    {
+        "source_path": "/var/cfengine/file_dist/etc/sudoers",
+        "source_host": "$(sys.policy_hub)",
+        "sudoers_path": "/etc/sudoers",
+        "visudo_path": "/usr/sbin/visudo",
+        "update_ifelapsed": "1",
+    }
+}

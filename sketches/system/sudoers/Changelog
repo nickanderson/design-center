@@ -1,0 +1,9 @@
+2013-09-27  Nick Anderson <nick@cmdln.org>
+
+	* Make sketch.json pass jsonlint
+	* Add Changelog
+	* Add new entrypoint from_remote_file
+	Copy sudoers from remote cfengine server, validate and update at specified
+	interval. Add supporting json param example.
+	* Remove stdlib dependancy per https://cfengine.com/dev/issues/3316
+		

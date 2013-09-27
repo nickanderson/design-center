@@ -50,6 +50,109 @@ bundle agent ensure(runenv,metadata,given_file_path,visudo_path,defaults,user_al
       ifvarclass => "$(vars)";
 }
 
+bundle agent from_remote_file(runenv, metadata, source_path, source_host, sudoers_path, visudo_path, update_ifelapsed)
+# @brief Use remote file served by cf-serverd as source for sudoers
+# @param runenv Environment to execute in
+# @param metadata Sketch metadata
+# @param source_path Full path on source server to file
+# @param source_host Server hosting sudoers file
+# @param sudoers_path Path to sudoers file
+# @param visudo_path Path to visudo. Used to validate sudoers config.
+# @param update_ifelapsed Time in minutes between comparing installed sudoers to centrally distributed version.
+{
+
+  vars:
+      "activation_id" string => canonify("$(this.bundle)_$($(metadata)[activation][identifier])_$($(metadata)[activation][timestamp])");
+
+      "vars" slist => { "@(default:$(runenv).env_vars)" };
+      "$(vars)" string => "$(default:$(runenv).$(vars))";
+
+      "tmp_path" string => "$(sudoers_path).cfsketch.staged";
+
+  classes:
+      "$(vars)" expression => "default:runenv_$(runenv)_$(vars)";
+      "not_$(vars)" expression => "!default:runenv_$(runenv)_$(vars)";
+
+      "$(tmp_path)_exists" expression => fileexists("$(tmp_path)");
+    
+      "sudoers_staged_validated"
+        expression => returnszero("$(visudo_path) -c -f $(tmp_path) > /dev/null 2>&1", "useshell"),
+        ifvarclass => canonify("$(tmp_path)_exists");
+    
+  
+  files:
+      "$(tmp_path)"
+        create    => "true",
+        copy_from => no_backup_secure_cp( $(source_path), $(source_host) ),
+        perms     => default:mog("0440", "root", "root"),
+        action    => default:if_elapsed($(update_ifelapsed)),
+        classes   => default:classes_generic("sudoers_staged"),
+        handle    => "$(activation_id)_files_tmp_path_sudoers",
+        comment   => "So that we dont copy a possibly broken file into place we
+                      stage it locally at the update frequency specified";
+
+    sudoers_staged_validated::
+      "$(sudoers_path)"
+        copy_from  => default:local_dcp( $(tmp_path) ),
+        perms      => default:mog("0440", "root", "root"),
+        classes    => default:classes_generic("sudoers_update"),
+        handle     => "$(activation_id)_files_sudoers_content",
+        comment    => "We don't want to install a broken sudoers, so we make sure
+                       it's syntactically correct before copying into place";
+
+    (sudoers_update_repaired|sudoers_update_ok).not_test::
+      "$(tmp_path)"
+        delete  => default:tidy,
+        classes => default:classes_generic("sudoers_stage_tidy"),
+        handle  => "$(activation_id)_files_sudoers_verify_reached_not_test_delete_tmp_path",
+        comment => "It's not nice to leave cruft lying around, so we clean up our
+                    staged file after we are done with it.";
+
+    any::
+      "$(sudoers_path)"
+        perms   => default:mog("0440", "root", "root"),
+        classes => default:classes_generic("sudoers_perms"),
+        handle  => "$(activation_id)_files_sudoers_perms",
+        comment => "We always want to ensure proper permissions on sudoers. Not
+                    only when we update the content.";
+
+
+  reports:
+    verbose.sudoers_staged_repaired::
+      "$(this.bundle): Staged sudoers to $(tmp_path) for verification";
+
+    verbose.sudoers_update_repaired::
+      "$(this.bundle): Verified new sudoers and updated successfully";
+
+    verose.sudoers_perms_repaired::
+      "$(this.bundle): Repaired permissions on $(sudoers_path)";
+
+    verbose::
+      "$(this.bundle): Unable to verify new sudoers. Possibly has bad syntax, or unable to stage new sudoers."
+        ifvarclass => and(canonify("$(tmp_path)_exists"), not("sudoers_staged_validated"));
+
+    verbose.sudoers_stage_tidy_repaired::
+      "$(this.bundle): Purged staged sudoers";
+
+    sudoers_update_repaired::
+      "1" bundle_return_value_index => "sudoers_updated";
+
+    !sudoers_update_repaired::
+      "0" bundle_return_value_index => "sudoers_updated";
+
+    sudoers_staged_repaired::
+      "1" bundle_return_value_index => "sudoers_staged";
+
+    !sudoers_staged_repaired::
+      "0" bundle_return_value_index => "sudoers_staged";
+
+    sudoers_staged_validated::
+      "1" bundle_return_value_index => "sudoers_staged_validated";
+
+    !sudoers_staged_validated::
+      "0" bundle_return_value_index => "sudoers_staged_validated";
+}
+
 bundle edit_line sudoers_insert_lines(defaults,user_alias,host_alias,cmnd_alias,runas_alias,up) {
   vars:
       "d_i" slist => getindices($(defaults));
@@ -66,4 +169,17 @@ bundle edit_line sudoers_insert_lines(defaults,user_alias,host_alias,cmnd_alias,
       "Host_Alias $($(host_alias)[$(h_i)[alias_name]) = $($(host_alias)[$(h_i)][host_list])";
       "Cmnd_Alias $($(cmnd_alias)[$(c_i)[alias_name]) = $($(cmnd_alias)[$(c_i)][cmnd_list])";
       "$($(up)[$(up_i)][user_spec]) $($(up)[$(up_i)][host_spec]) = ($($(up)[$(up_i)][host_spec])) $($(up)[$(up_i)][password]): $($(up)[$(up_i)][cmnd_spec])";
+}
+
+body copy_from no_backup_secure_cp(from,server)
+# @brief Copy file from server securly without making backup
+# @param from Full path to file on remote server
+# @param server Hostname or IP that remote file resides on
+{
+source      => "$(from)";
+servers     => { "$(server)" };
+compare     => "digest";
+encrypt     => "true";
+verify      => "true";
+copy_backup => "false";
 }

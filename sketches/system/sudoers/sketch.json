@@ -3,31 +3,85 @@
     {
         "main.cf": { "desc": "main file" },
         "README.md": { "documentation": true },
+        "params/example_from_remote_file.json": { "comment": "Example parameters to maintain sudoers from a centrally distributed file."},
+        "params/demo.json": { "comment": "Example parameters to maintain sudoers using specified values."},
+        "test.cf": {"comment": "Test Policy"},
+        "Changelog": { "comment": "Changelog"}
+
     },
 
     "metadata":
     {
         "name": "System::Sudoers",
         "description": "Sets defaults and user permissions in the sudoers file",
-        "version": 1.00,
+        "version": "1.1.0",
         "license": "MIT",
         "tags": [ "cfdc", "sudoers" ],
-        "authors": [ "Jon Henrik Bjornstad <jon.henrik.bjornstad@cfengine.com>" ],
-        "depends": { "CFEngine::stdlib": { "version": 105 }, "CFEngine::dclib": {}, "cfengine": { "version": "3.4.0" }, "os": [ "linux" ] }
+        "authors": [ "Jon Henrik Bjornstad <jon.henrik.bjornstad@cfengine.com>", "Nick Anderson <nick@cmdln.org>" ],
+        "depends": { "CFEngine::dclib": {}, "cfengine": { "version": "3.4.0" }, "os": [ "linux" ] }
     },
     "api" : {
 		     "ensure" : [
 				 { "name" : "runenv", "type" : "environment" },
 				 { "name" : "metadata", "type" : "metadata" },
 				 { "name" : "file_path", "type" : "string", "default" : "/etc/sudoers" },
-				 { "name" : "visudo_path", description: "Path to visudo command.  Use /bin/true to make it always succeed.", "type" : "string", "default" : "/usr/sbin/visudo" },
+				 { "name" : "visudo_path", "description": "Path to visudo command.  Use /bin/true to make it always succeed.", "type" : "string", "default" : "/usr/sbin/visudo" },
 				 { "name" : "defaults", "type" : "array" },
 				 { "name" : "user_alias", "type" : "array" },
 				 { "name" : "host_alias", "type" : "array" },
 				 { "name" : "cmnd_alias", "type" : "array" },
 				 { "name" : "runas_alias", "type" : "array" },
-				 { "name" : "user_permissions", "type" : "array" },
-			 ]
+				 { "name" : "user_permissions", "type" : "array" }
+			 ],
+                     "from_remote_file" : [
+                                            { "name" : "runenv", "type" : "environment" },
+                                            { "name" : "metadata", "type" : "metadata" },
+                                            {
+                                              "description": "Full path on source server to file",
+                                              "name": "source_path",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "description" : "Server hosting sudoers file",
+                                              "name" : "source_host",
+                                              "type" : "string",
+                                              "default" : "$(sys.policy_hub)"
+                                            },
+                                            {
+                                              "description" : "Path to sudoers file",
+                                              "name" : "sudoers_path",
+                                              "type" : "string",
+                                              "default" : "/etc/sudoers"
+                                            },
+                                            {
+                                              "description" : "Path to visudo. Used to validate sudoers config.",
+                                              "name" : "visudo_path",
+                                              "type" : "string",
+                                              "default" : "/usr/sbin/visudo"
+                                            },
+                                            {
+                                              "description" : "Time in minutes between comparing installed sudoers to centrally distributed version.",
+                                              "name" : "update_ifelapsed",
+                                              "type" : "string",
+                                              "default" : "60"
+                                            },
+                                            {
+                                              "name": "sudoers_staged",
+                                              "description": "Return 1 if sudoers was successfully staged from remote server",
+                                              "type": "return"
+                                            },
+                                            {
+                                              "name": "sudoers_updated",
+                                              "description": "Return 1 if sudoers was successfully updated",
+                                              "type": "return"
+                                            },
+                                            {
+                                              "name": "sudoers_staged_validated",
+                                              "description": "Return 1 if staged sudoers was successfully validated",
+                                              "type": "return"
+                                            }
+                                          ]
+
 		},
     "namespace": "cfdc_sudoers",
     "interface": [ "main.cf" ]
